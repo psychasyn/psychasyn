@@ -1,0 +1,33 @@
+name: Cl
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Download Ngrok
+        run: Invoke-WebRequest -Uri "https://bin.equinox.io/a/bjtcPNfaiTB/ngrok-v3-3.19.0-windows-amd64.zip" -OutFile "ngrok.zip"
+
+      - name: Extract Ngrok
+        run: Expand-Archive -Path "ngrok.zip" -DestinationPath "." 
+
+      - name: Authenticate Ngrok
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        run: .\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
+
+      - name: Enable Remote Desktop
+        run: |
+          if (!(Test-Path "HKLM:\System\CurrentControlSet\Control\Terminal Server")) {
+              Write-Host "Registry path not found. Creating it..."
+              New-Item -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Force
+          }
+          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1
+          Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "@ishow3AM" -Force)
+
+      - name: Start Ngrok Tunnel
+        run: .\ngrok.exe tcp 3389
